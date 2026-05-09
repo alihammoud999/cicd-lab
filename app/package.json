@@ -1,0 +1,19 @@
+{
+  "name": "cicd-lab-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Lab 010 CI/CD with GitHub Actions",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "mocha server.test.js",
+    "test:integration": "mocha server.integration.test.js"
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "ioredis": "^5.3.2"
+  },
+  "devDependencies": {
+    "mocha": "^11.7.5",
+    "supertest": "^7.2.2"
+  }
+}

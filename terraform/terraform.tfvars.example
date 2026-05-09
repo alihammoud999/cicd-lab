@@ -1,0 +1,3 @@
+region        = "eu-north-1"
+bucket_suffix = "ali-lab010-change-me"
+environment   = "prod"

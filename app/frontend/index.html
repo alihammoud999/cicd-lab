@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CI/CD Lab — Ali Al Hadi Hammoud</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --text: #172033;
+      --muted: #64748b;
+      --line: #d9e2ec;
+      --accent: #2563eb;
+      --ok: #047857;
+      --warn: #b45309;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      background: #102033;
+      color: #fff;
+      padding: 30px max(24px, 8vw);
+    }
+    main {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 28px 24px 44px;
+    }
+    h1 { margin: 0 0 8px; font-size: 34px; line-height: 1.1; }
+    h2 { margin: 0 0 12px; font-size: 20px; }
+    p { color: var(--muted); }
+    .env {
+      display: inline-flex;
+      margin-top: 10px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: #dbeafe;
+      color: #1e3a8a;
+      font-weight: 700;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 10px 24px rgba(16, 32, 51, 0.08);
+    }
+    .value {
+      font-family: Consolas, Monaco, monospace;
+      overflow-wrap: anywhere;
+    }
+    .status { color: var(--ok); font-weight: 700; }
+    .status.error { color: var(--warn); }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 18px 0;
+    }
+    button {
+      border: 0;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 700;
+      padding: 10px 14px;
+    }
+    input {
+      min-width: min(100%, 320px);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font: inherit;
+    }
+    .message {
+      border-top: 1px solid var(--line);
+      padding: 12px 0;
+    }
+    .message:first-child { border-top: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>CI/CD Lab — Ali Al Hadi Hammoud</h1>
+    <p>GitHub Actions, ECR, EKS, dev/prod deployments, Trivy, and Terraform.</p>
+    <span class="env">Environment: LAB</span>
+  </header>
+
+  <main>
+    <div class="grid">
+      <section class="card">
+        <h2>Backend Health</h2>
+        <div id="health-status" class="status">Loading</div>
+      </section>
+      <section class="card">
+        <h2>Redis Status</h2>
+        <div id="redis-status" class="value">-</div>
+      </section>
+      <section class="card">
+        <h2>Backend Pod Name</h2>
+        <div id="pod-name" class="value">-</div>
+      </section>
+      <section class="card">
+        <h2>Visit Count</h2>
+        <div id="visit-count" class="value">-</div>
+      </section>
+    </div>
+
+    <div class="actions">
+      <button type="button" onclick="loadDashboard()">Refresh</button>
+      <input id="message-input" type="text" placeholder="Message for Redis">
+      <button type="button" onclick="sendMessage()">Send Message</button>
+    </div>
+
+    <section class="card">
+      <h2>Messages</h2>
+      <div id="messages">Loading messages...</div>
+    </section>
+  </main>
+
+  <script>
+    const api = "/api";
+
+    function setText(id, value) {
+      document.getElementById(id).textContent = value || "-";
+    }
+
+    async function getJson(path, options) {
+      const response = await fetch(path, Object.assign({ cache: "no-store" }, options || {}));
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || path + " failed");
+      return data;
+    }
+
+    async function loadDashboard() {
+      const status = document.getElementById("health-status");
+      status.className = "status";
+      status.textContent = "Loading";
+      try {
+        const health = await getJson(api + "/health");
+        const visits = await getJson(api + "/visits");
+        const messages = await getJson(api + "/messages");
+        status.textContent = health.status;
+        setText("redis-status", health.redis);
+        setText("pod-name", health.pod || visits.pod);
+        setText("visit-count", visits.visits);
+        const rows = (messages.messages || []).map((message) =>
+          '<div class="message"><strong>' + escapeHtml(message.pod) + "</strong>: " +
+          escapeHtml(message.text) + "<br><small>" + escapeHtml(message.timestamp) + "</small></div>"
+        ).join("");
+        document.getElementById("messages").innerHTML = rows || "No messages yet.";
+      } catch (error) {
+        status.className = "status error";
+        status.textContent = error.message;
+      }
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById("message-input");
+      const text = input.value.trim();
+      if (!text) return;
+      await getJson(api + "/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+      input.value = "";
+      await loadDashboard();
+    }
+
+    function escapeHtml(value) {
+      return String(value || "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      })[char]);
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>
